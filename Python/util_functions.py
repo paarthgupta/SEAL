@@ -3,8 +3,8 @@ import numpy as np
 import random
 from tqdm import tqdm
 import os, sys, pdb, math, time
-import cPickle as cp
-#import _pickle as cp  # python3 compatability
+#import cPickle as cp
+import _pickle as cp  # python3 compatability
 import networkx as nx
 import argparse
 import scipy.io as sio
@@ -162,7 +162,7 @@ def node_label(subgraph):
     # an implementation of the proposed double-radius node labeling (DRNL)
     K = subgraph.shape[0]
     subgraph_wo0 = subgraph[1:, 1:]
-    subgraph_wo1 = subgraph[[0]+range(2, K), :][:, [0]+range(2, K)]
+    subgraph_wo1 = subgraph[[0]+list(range(2, K)), :][:, [0]+list(range(2, K))]
     dist_to_0 = ssp.csgraph.shortest_path(subgraph_wo0, directed=False, unweighted=True)
     dist_to_0 = dist_to_0[1:, 0]
     dist_to_1 = ssp.csgraph.shortest_path(subgraph_wo1, directed=False, unweighted=True)

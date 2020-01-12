@@ -1,7 +1,8 @@
 import torch
+import pdb
 import numpy as np
 import sys, copy, math, time, pdb
-import cPickle as pickle
+# import cPickle as pickle
 import scipy.io as sio
 import scipy.sparse as ssp
 import os.path
@@ -19,7 +20,7 @@ parser.add_argument('--train-name', default=None, help='train name')
 parser.add_argument('--test-name', default=None, help='test name')
 parser.add_argument('--max-train-num', type=int, default=100000, 
                     help='set maximum number of train links (to fit into memory)')
-parser.add_argument('--no-cuda', action='store_true', default=False,
+parser.add_argument('--no-cuda', action='store_true', default=True,
                     help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
@@ -37,6 +38,7 @@ parser.add_argument('--use-attribute', action='store_true', default=False,
                     help='whether to use node attributes')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
+print(torch.cuda.is_available())
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
@@ -59,7 +61,7 @@ if args.train_name is None:
     args.data_dir = os.path.join(args.file_dir, 'data/{}.mat'.format(args.data_name))
     data = sio.loadmat(args.data_dir)
     net = data['net']
-    if data.has_key('group'):
+    if 'group' in data:
         # load node attributes (here a.k.a. node classes)
         attributes = data['group'].toarray().astype('float32')
     else:
@@ -111,8 +113,8 @@ cmd_args.hidden = 128
 cmd_args.out_dim = 0
 cmd_args.dropout = True
 cmd_args.num_class = 2
-cmd_args.mode = 'gpu'
-cmd_args.num_epochs = 50
+cmd_args.mode = 'gpu' if args.cuda else 'cpu'
+cmd_args.num_epochs = 2
 cmd_args.learning_rate = 1e-4
 cmd_args.batch_size = 50
 cmd_args.printAUC = True
@@ -126,6 +128,7 @@ if cmd_args.sortpooling_k <= 1:
     cmd_args.sortpooling_k = max(10, cmd_args.sortpooling_k)
     print('k used in SortPooling is: ' + str(cmd_args.sortpooling_k))
 
+#pdb.set_trace()
 classifier = Classifier()
 if cmd_args.mode == 'gpu':
     classifier = classifier.cuda()
