@@ -21,6 +21,9 @@ import node2vec
 import multiprocessing as mp
 from collections import defaultdict
 from scipy.sparse import csr_matrix
+sys.path.append('/home2/e1-313-15477/hynetworkx/src')
+from data_preparer import clean_train_hypergraph
+
 
 def sample_neg(net, test_ratio=0.1, train_pos=None, test_pos=None, max_train_num=None):
     # get upper triangular matrix
@@ -54,7 +57,8 @@ def sample_neg(net, test_ratio=0.1, train_pos=None, test_pos=None, max_train_num
     test_neg = (neg[0][train_num:], neg[1][train_num:])
     return train_pos, train_neg, test_pos, test_neg
 
-def links2subgraphs(A, S, train_pos, train_neg, test_pos, test_neg, h=1, max_nodes_per_hop=None, node_information=None):
+def links2subgraphs(A, S, train_pos, train_neg, test_pos, test_neg, h=1, max_nodes_per_hop=None, 
+                    node_information=None, edge_information=None):
     # automatically select h from {1, 2}
     if h == 'auto':
         # split train into val_train and val_test
@@ -74,6 +78,7 @@ def links2subgraphs(A, S, train_pos, train_neg, test_pos, test_neg, h=1, max_nod
 
     # extract enclosing subgraphs
     max_n_label = {'value': 0}
+    max_f_label = {'value': 0}
     def helper(A, S, links, g_label):
         '''
         g_list = []
@@ -86,7 +91,7 @@ def links2subgraphs(A, S, train_pos, train_neg, test_pos, test_neg, h=1, max_nod
         # the new parallel extraction code
         start = time.time()
         pool = mp.Pool(mp.cpu_count())
-        results = pool.map_async(parallel_worker, [((i, j), A, S, h, max_nodes_per_hop, node_information) for i, j in zip(links[0], links[1])])
+        results = pool.map_async(parallel_worker, [((i, j), A, S, h, max_nodes_per_hop, node_information, edge_information) for i, j in zip(links[0], links[1])])
         remaining = results._number_left
         pbar = tqdm(total=remaining)
         while True:
@@ -98,8 +103,9 @@ def links2subgraphs(A, S, train_pos, train_neg, test_pos, test_neg, h=1, max_nod
         pool.close()
         pbar.close()
 #         g_list = [GNNGraph(g, g_label, n_labels, n_features) for g, _, n_labels, n_features in results]
-        hyg_list = [HGNNHypergraph(S_g, g_label, n_labels, n_features) for _, S_g, n_labels, n_features in results]
-        max_n_label['value'] = max(max([max(n_labels) for _, _, n_labels, _ in results]), max_n_label['value'])
+        hyg_list = [HGNNHypergraph(S_g, g_label, n_labels, n_features, f_labels) for _, S_g, n_labels, f_labels, n_features in results]
+        max_n_label['value'] = max(max([max(n_labels) for _, _, n_labels, _, _ in results]), max_n_label['value'])
+        max_f_label['value'] = max(max([max(f_labels) if len(f_labels)>0 else 0 for _, _, _, f_labels, _ in results]), max_f_label['value'])
         end = time.time()
         print("Time eplased for subgraph extraction: {}s".format(end-start))
         return hyg_list
@@ -108,41 +114,32 @@ def links2subgraphs(A, S, train_pos, train_neg, test_pos, test_neg, h=1, max_nod
 #     train_graphs = helper(A, train_pos, 1) + helper(A, train_neg, 0)
 #     test_graphs = helper(A, test_pos, 1) + helper(A, test_neg, 0)
     train_hypergraphs = helper(A, S, train_pos, 1) + helper(A, S, train_neg, 0)
+    print("train_hypergraph_done")
     test_hypergraphs = helper(A, S, test_pos, 1) + helper(A, S, test_neg, 0)
-    print(max_n_label)
-    return train_hypergraphs, test_hypergraphs, max_n_label['value']
+    print("test_hypergraph_done")
+    print(max_n_label, max_f_label)
+    return train_hypergraphs, test_hypergraphs, max_n_label['value'], max_f_label['value']
 
 
 def parallel_worker(x):
     return subgraph_extraction_labeling(*x)
+    
 
 def filter_hypergraph(S, nodes):
-    F = incidence_to_hyperedges(S)
-    matching_F = {f for f in F if f.issubset(set(nodes))}
-    
+    S_cleaned = clean_train_hypergraph(S, csr_matrix(([1, 1], ([nodes[0], nodes[1]], [nodes[1], nodes[0]])), shape=(S.shape[0], S.shape[0])))
+    F_dict = incidence_to_hyperedges(S_cleaned, _type=dict)
+    matching_F_dict = {j: f for j, f in F_dict.items() if f.issubset(set(nodes))}
+    I = nodes
+    J = list(matching_F_dict)
     try:
-        S_g = hyperedges_to_incidence(matching_F, max(nodes)+1)
-#         print('S:{}, S_g:{}'.format(S.shape, S_g.shape))
+        S_g = S_cleaned[I, :][:, J]
     except IndexError:
-        print('Error in filter_hypergraph')
+        print('Caught exception', type(I), type(J), S_cleaned.shape)
         raise (IndexError)
-    S_g = S_g[(S_g.sum(axis=1) > 0).nonzero()[0], :]
-    
-    S_gT= S_g.T
-    diff = len(nodes) - S_g.shape[0]
-#     if diff != 0:
-#         print('S_g nodes:{}, nodes:{}'.format(S_g.shape[0], len(nodes)))
-    if diff > 0:
-#         pdb.set_trace()
-        I, J, V = ssp.find(S_g)
-        S_g = csr_matrix((V, (I, J)), shape=(S_g.shape[0] + diff, S_g.shape[1]))
-#         S_g = csr_matrix((S_gT.data, S_gT.indices, S_gT.indptr), shape=(S_gT.shape[0], S_gT.shape[1] + diff)).T
-#         print('rectified!')
-    
     return S_g
 
 
-def subgraph_extraction_labeling(ind, A, S, h=1, max_nodes_per_hop=None, node_information=None):
+def subgraph_extraction_labeling(ind, A, S, h=1, max_nodes_per_hop=None, node_information=None, edge_information=None):
     # extract the h-hop enclosing subgraph around link 'ind'
     dist = 0
     nodes = set([ind[0], ind[1]])
@@ -165,20 +162,22 @@ def subgraph_extraction_labeling(ind, A, S, h=1, max_nodes_per_hop=None, node_in
     nodes.remove(ind[1])
     nodes = [ind[0], ind[1]] + list(nodes) 
     subgraph = A[nodes, :][:, nodes]
-    S_g = filter_hypergraph(S, set(nodes))
+    S_g = filter_hypergraph(S, nodes)
     # apply node-labeling
-    labels = node_label(subgraph)
+    labels, f_labels = node_label(subgraph, S_g)
     # get node features
     features = None
     if node_information is not None:
         features = node_information[nodes]
+#     if edge_information is not None:
+#         features = edge_information[edges]
     # construct nx graph
     g = nx.from_scipy_sparse_matrix(subgraph)
     # remove link between target nodes
     if g.has_edge(0, 1):
         g.remove_edge(0, 1)
     # TODO: remove edge 0, 1 from S_g also
-    return g, S_g, labels.tolist(), features
+    return g, S_g, labels.tolist(), f_labels.tolist(), features
 
 
 def neighbors(fringe, A):
@@ -191,7 +190,13 @@ def neighbors(fringe, A):
     return res
 
 
-def node_label(subgraph):
+def S_to_bipartite(S):
+    B = nx.bipartite.from_biadjacency_matrix(S)
+    return B
+
+
+
+def node_label(subgraph, S):
     # an implementation of the proposed double-radius node labeling (DRNL)
     K = subgraph.shape[0]
     subgraph_wo0 = subgraph[1:, 1:]
@@ -207,9 +212,37 @@ def node_label(subgraph):
     labels[np.isinf(labels)] = 0
     labels[labels>1e6] = 0  # set inf labels to 0
     labels[labels<-1e6] = 0  # set -inf labels to 0
-    return labels
-
     
+    u = 0
+    v = 1
+    B = S_to_bipartite(S)
+    dist_to_u = {i-S.shape[0]: j/2 for i, j in nx.single_source_shortest_path_length(B, u).items() if i >= S.shape[0]}
+    dist_to_v = {i-S.shape[0]: j/2 for i, j in nx.single_source_shortest_path_length(B, v).items() if i >= S.shape[0]}
+    
+    if len(dist_to_u) == 0:
+#         print('empty distance')
+        dist_to_u = np.ones(S.shape[1])*np.inf
+    else:
+#         print('non-empty distance')
+        I, V = list(zip(*dist_to_u.items()))
+        dist_to_u = np.array(csr_matrix((V, (I, [0]*len(I))), shape=(S.shape[1], 1)).todense()).ravel()
+    if len(dist_to_v) == 0:
+#         print('empty distance')
+        dist_to_v = np.ones(S.shape[1])*np.inf
+    else:
+#         print('non-empty distance')
+        I, V = list(zip(*dist_to_v.items()))
+        dist_to_v = np.array(csr_matrix((V, (I, [0]*len(I))), shape=(S.shape[1], 1)).todense()).ravel()
+    d = (dist_to_u + dist_to_v).astype(int)
+    d_over_2, d_mod_2 = np.divmod(d, 2)
+    f_labels = 1 + np.minimum(dist_to_u, dist_to_v).astype(int) + d_over_2 * (d_over_2 + d_mod_2 - 1)
+#     f_labels = np.concatenate((np.array([1, 1]), f_labels))
+    f_labels[np.isinf(f_labels)] = 0
+    f_labels[f_labels>1e6] = 0  # set inf labels to 0
+    f_labels[f_labels<-1e6] = 0  # set -inf labels to 0
+    return labels, f_labels
+
+
 def generate_node2vec_embeddings(A, emd_size=128, negative_injection=False, train_neg=None):
     if negative_injection:
         row, col = train_neg
@@ -236,6 +269,8 @@ def generate_node2vec_embeddings(A, emd_size=128, negative_injection=False, trai
     mean_embedding = sum_embeddings / (A.shape[0] - len(empty_list))
     embeddings[empty_list] = mean_embedding
     return embeddings
+
+
 
 def incidence_to_hyperedges(S, silent_mode=True, _type=set):
     I, J = S.nonzero()
