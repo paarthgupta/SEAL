@@ -1,4 +1,27 @@
 from __future__ import print_function
+
+def get_base_path():
+    import os
+    cwd = os.getcwd()
+    print(cwd)
+    if cwd.startswith('/storage2/home2/'):
+        return '/home2/e1-313-15477/'
+    elif cwd.startswith('/content/'):
+        return '/content/drive/My Drive/Colab Notebooks/data/'
+    else:
+        print('WARNING: Neither on server nor on Colab.')
+
+def get_library_path():
+    import os
+    cwd = os.getcwd()
+    print(cwd)
+    if cwd.startswith('/storage2/home2/'):
+        return '/home2/e1-313-15477/'
+    elif cwd.startswith('/content/'):
+        return '/content/drive/My Drive/Colab Notebooks/libraries/'
+    else:
+        print('WARNING: Neither on server nor on Colab.')
+
 import numpy as np
 import random
 from tqdm import tqdm

@@ -14,7 +14,7 @@ from tqdm import tqdm
 import pdb
 from util import get_library_path
 lib_path = get_library_path()
-sys.path.append(os.path.join(lib_path, 'pytorch_DGCNN/lib/'))
+sys.path.append(os.path.join(lib_path, 'SEAL/pytorch_DGCNN/lib/'))
 from gnn_lib import GNNLIB
 from pytorch_util import weights_init, gnn_spmm
 

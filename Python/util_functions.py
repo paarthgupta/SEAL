@@ -1,10 +1,25 @@
 from __future__ import print_function
 def get_base_path():
-    return '/home2/e1-313-15477/'
-#     return '/content/drive/My Drive/Colab Notebooks/data/'
+    import os
+    cwd = os.getcwd()
+    print(cwd)
+    if cwd.startswith('/storage2/home2/'):
+        return '/home2/e1-313-15477/'
+    elif cwd.startswith('/content/'):
+        return '/content/drive/My Drive/Colab Notebooks/data/'
+    else:
+        print('WARNING: Neither on server nor on Colab.')
+
 def get_library_path():
-    return '/home2/e1-313-15477/'
-#     return '/content/drive/My Drive/Colab Notebooks/libraries/'
+    import os
+    cwd = os.getcwd()
+    print(cwd)
+    if cwd.startswith('/storage2/home2/'):
+        return '/home2/e1-313-15477/'
+    elif cwd.startswith('/content/'):
+        return '/content/drive/My Drive/Colab Notebooks/libraries/'
+    else:
+        print('WARNING: Neither on server nor on Colab.')
 
 import numpy as np
 import random
@@ -22,7 +37,7 @@ import warnings
 warnings.simplefilter('ignore', ssp.SparseEfficiencyWarning)
 cur_dir = os.path.dirname(os.path.realpath(__file__))
 lib_path = get_library_path()
-sys.path.append(os.path.join(lib_path, 'pytorch_DGCNN'))
+sys.path.append(os.path.join(lib_path, 'SEAL/pytorch_DGCNN'))
 from util import GNNGraph
 sys.path.append(os.path.join(lib_path, 'SEAL/Python/software/node2vec/src'))
 import node2vec

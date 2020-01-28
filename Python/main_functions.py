@@ -10,7 +10,7 @@ from utils import *
 from data_preparer import S_to_A, clean_train_hypergraph
 from scipy.sparse import csr_matrix
 from util_functions import *
-sys.path.append(os.path.join(library_path, 'pytorch_DGCNN'))
+sys.path.append(os.path.join(library_path, 'SEAL/pytorch_DGCNN'))
 from main import *
 
 data_path = get_base_path()
