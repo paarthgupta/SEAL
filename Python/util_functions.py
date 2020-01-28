@@ -45,7 +45,7 @@ import multiprocessing as mp
 from scipy.sparse import csr_matrix
 from scipy.sparse import csr_matrix,hstack, vstack
 
-sys.path.append('/home2/e1-313-15477/hynetworkx/src')
+sys.path.append(os.path.join(lib_path, 'hynetworkx/src'))
 from data_preparer import S_to_A, A_to_S
 
 default_mode = 'clique'
