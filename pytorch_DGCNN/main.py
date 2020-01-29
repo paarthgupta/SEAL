@@ -95,6 +95,7 @@ class Classifier(nn.Module):
             node_tag = torch.zeros(n_nodes, cmd_args.feat_dim)
             node_tag.scatter_(1, concat_tag, 1)
             if bip_flag:
+                concat_bip_tag = torch.LongTensor(concat_bip_tag).view(-1, 1)
                 node_bip_tag = torch.zeros(n_nodes, 1)
                 node_bip_tag.scatter_(1, concat_bip_tag, 1)
                 node_tag = torch.cat(node_tag, node_bip_tag)
