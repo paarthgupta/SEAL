@@ -84,7 +84,7 @@ class GNNGraph(object):
         self.num_edges = len(g.edges())
         self.node_bip_tags = None
         if make_bip:
-            self.node_bip_tags = np.array([int(i < num_nodes) for i in range(self.num_nodes)])
+            self.node_bip_tags = [int(i < num_nodes) for i in range(self.num_nodes)]
         if len(g.edges()) != 0:
             x, y = zip(*g.edges())
             self.num_edges = len(x)        
